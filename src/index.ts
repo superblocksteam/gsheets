@@ -356,27 +356,22 @@ export default class GoogleSheetsPlugin extends BasePlugin {
     const columns: SheetColumn[] = [];
     let rowsNumber = 0;
     if (extractFirstRowHeader) {
-      const result = await sheetsClient.spreadsheets.get({
-        includeGridData: true,
+      const result = await sheetsClient.spreadsheets.values.get({
         spreadsheetId: spreadsheetId,
-        ranges: [`${sheetTitle}!A1:${MAX_A1_RANGE}`]
+        range: `${sheetTitle}!A1:${MAX_A1_RANGE}`
       });
       let columnIndex = 0;
-      result.data.sheets?.forEach((sheetDataItem) => {
-        sheetDataItem?.data?.forEach((sheetDataItemDataItem) => {
-          sheetDataItemDataItem?.rowData?.forEach((row) => {
-            if (rowsNumber === 0) {
-              row?.values?.forEach((cellData) => {
-                columns.push({
-                  name: this.extractCellValue(cellData, GoogleSheetsFormatType.FORMATTED_VALUE) as string,
-                  type: 'sheet',
-                  sourceColumnIndex: columnIndex++
-                });
-              });
-            }
-            rowsNumber++;
+      result.data?.values.forEach((row) => {
+        if (rowsNumber === 0) {
+          row?.forEach((cellData) => {
+            columns.push({
+              name: cellData,
+              type: 'sheet',
+              sourceColumnIndex: columnIndex++
+            });
           });
-        });
+        }
+        rowsNumber++;
       });
     }
     return [columns, rowsNumber];
