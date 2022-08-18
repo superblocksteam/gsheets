@@ -1,4 +1,5 @@
 import A1 from '@flighter/a1-notation';
+import { validateRowsSchema } from '@superblocksteam/schemas';
 import {
   Column,
   ExecutionOutput,
@@ -10,8 +11,7 @@ import {
   Table,
   GoogleSheetsFormatType,
   GoogleSheetsActionConfiguration,
-  GoogleSheetsAuthType,
-  validateRowsSchema
+  GoogleSheetsAuthType
 } from '@superblocksteam/shared';
 import { BasePlugin, PluginExecutionProps } from '@superblocksteam/shared-backend';
 import { google, sheets_v4, drive_v3 } from 'googleapis';

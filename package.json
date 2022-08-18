@@ -1,6 +1,6 @@
 {
   "name": "@superblocksteam/gsheets",
-  "version": "0.1891.0",
+  "version": "0.1902.0",
   "description": "Superblocks Google Sheets Plugin",
   "publishConfig": {
     "registry": "https://npm.pkg.github.com"
@@ -25,6 +25,7 @@
   "dependencies": {
     "@superblocksteam/shared": "^0.x",
     "@superblocksteam/shared-backend": "^0.x",
+    "@superblocksteam/schemas": "^0.x",
     "@flighter/a1-notation": "2.1.2",
     "googleapis": "98.0.0"
   },
