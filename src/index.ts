@@ -35,35 +35,35 @@ export default class GoogleSheetsPlugin extends BasePlugin {
     try {
       const [, driveClient, sheetsClient] = this.getGoogleClients(datasourceConfiguration);
       const tables: Table[] = [];
-      let nextPageToken: string;
+      let nextPageToken: string | null | undefined;
       do {
         const result = await driveClient.files.list({
           q: "mimeType='application/vnd.google-apps.spreadsheet'",
           fields: 'nextPageToken, files(id,name)',
-          pageToken: nextPageToken
+          pageToken: nextPageToken ?? undefined
         });
         nextPageToken = result.data.nextPageToken;
-        for (const file of result.data.files) {
+        for (const file of result.data.files ?? []) {
           if (actionConfiguration && file.id === actionConfiguration.spreadsheetId) {
             const spreadsheet = await sheetsClient.spreadsheets.get({
               includeGridData: false,
               spreadsheetId: file.id
             });
             const columns: Column[] = [];
-            for (const sheet of spreadsheet.data.sheets) {
-              columns.push({ name: sheet.properties.title, type: 'column' });
+            for (const sheet of spreadsheet.data.sheets ?? []) {
+              columns.push({ name: sheet.properties?.title ?? '', type: 'column' });
             }
             tables.push({
-              id: spreadsheet.data.spreadsheetId,
+              id: spreadsheet.data.spreadsheetId ?? '',
               type: TableType.TABLE,
-              name: spreadsheet.data.properties.title,
+              name: spreadsheet.data.properties?.title ?? '',
               columns: columns
             });
           } else {
             tables.push({
-              id: file.id,
+              id: file.id ?? undefined,
               type: TableType.TABLE,
-              name: file.name,
+              name: file.name ?? '',
               columns: []
             });
           }
@@ -101,9 +101,9 @@ export default class GoogleSheetsPlugin extends BasePlugin {
         case GoogleSheetsActionType.APPEND_SPREADSHEET:
           ret.output = await this.appendToSpreadsheet(
             datasourceConfiguration as GoogleSheetsDatasourceConfiguration,
-            actionConfiguration.spreadsheetId,
-            actionConfiguration.sheetTitle,
-            actionConfiguration.data
+            actionConfiguration.spreadsheetId ?? '',
+            actionConfiguration.sheetTitle ?? '',
+            actionConfiguration.data ?? ''
           );
           return ret;
       }
@@ -200,7 +200,7 @@ export default class GoogleSheetsPlugin extends BasePlugin {
 
   async preDelete(datasourceConfiguration: GoogleSheetsDatasourceConfiguration): Promise<void> {
     try {
-      if (datasourceConfiguration.authType === GoogleSheetsAuthType.SERVICE_ACCOUNT || !datasourceConfiguration.authConfig.authToken) {
+      if (datasourceConfiguration.authType === GoogleSheetsAuthType.SERVICE_ACCOUNT || !datasourceConfiguration.authConfig?.authToken) {
         // if there is no auth token - nothing to revoke
         return;
       }
@@ -242,7 +242,12 @@ export default class GoogleSheetsPlugin extends BasePlugin {
       spreadsheetId: spreadsheetId
     };
     let columnNamesOffset = 0;
-    const [columnNames] = await this.extractSheetColumns(spreadsheetId, sheetTitle, sheetsClient, extractFirstRowHeader);
+    const [columnNames] = await this.extractSheetColumns(
+      spreadsheetId ?? '',
+      sheetTitle ?? '',
+      sheetsClient,
+      Boolean(extractFirstRowHeader)
+    );
     if (range && extractFirstRowHeader) {
       const a1Range = new A1(range);
       if (range != a1Range.toString()) {
@@ -264,7 +269,7 @@ export default class GoogleSheetsPlugin extends BasePlugin {
       params.ranges = [`${sheetTitle}!A1:${MAX_A1_RANGE}`];
     }
     const result = await sheetsClient.spreadsheets.get(params);
-    return this.sheetDataToRecordSet(result.data.sheets, format, columnNames, columnNamesOffset);
+    return this.sheetDataToRecordSet(result.data.sheets ?? [], format, columnNames, columnNamesOffset);
   }
 
   sheetDataToRecordSet(
@@ -287,7 +292,10 @@ export default class GoogleSheetsPlugin extends BasePlugin {
             } else {
               columnName = this.toExcelColumnName(columnIndex + columnNamesOffset);
             }
-            currentRow[columnName] = this.extractCellValue(cellData, format);
+            const value = this.extractCellValue(cellData, format);
+            if (typeof value !== 'undefined') {
+              currentRow[columnName] = value;
+            }
             columnIndex++;
           });
           recordsSet.push(currentRow);
@@ -297,7 +305,7 @@ export default class GoogleSheetsPlugin extends BasePlugin {
     return recordsSet;
   }
 
-  extractCellValue(cellData: sheets_v4.Schema$CellData, format: GoogleSheetsFormatType): CellValueType {
+  extractCellValue(cellData: sheets_v4.Schema$CellData, format: GoogleSheetsFormatType): CellValueType | undefined {
     if (format === GoogleSheetsFormatType.EFFECTIVE_VALUE) {
       return this.extractExtendedValue(cellData.effectiveValue);
     } else if (format === GoogleSheetsFormatType.USER_ENTERED_VALUE) {
@@ -307,13 +315,15 @@ export default class GoogleSheetsPlugin extends BasePlugin {
     }
   }
 
-  extractExtendedValue(extendedValue: sheets_v4.Schema$ExtendedValue): CellValueType {
+  extractExtendedValue(extendedValue?: sheets_v4.Schema$ExtendedValue): CellValueType | undefined {
+    if (!extendedValue) return;
     return (
       extendedValue.stringValue ??
       extendedValue.numberValue ??
       extendedValue.boolValue ??
       extendedValue.errorValue ??
-      extendedValue.formulaValue
+      extendedValue.formulaValue ??
+      undefined
     );
   }
 
@@ -321,16 +331,16 @@ export default class GoogleSheetsPlugin extends BasePlugin {
     datasourceConfiguration: GoogleSheetsDatasourceConfiguration
   ): [OAuth2Client | GoogleAuth, drive_v3.Drive, sheets_v4.Sheets] {
     let authClient;
-    if (datasourceConfiguration.authType === GoogleSheetsAuthType.OAUTH2_CODE && !datasourceConfiguration.authConfig.authToken) {
+    if (datasourceConfiguration.authType === GoogleSheetsAuthType.OAUTH2_CODE && !datasourceConfiguration.authConfig?.authToken) {
       throw new IntegrationError(`Authentication has failed. Please ensure you're connected to your Google account.`);
     } else if (datasourceConfiguration.authType === GoogleSheetsAuthType.SERVICE_ACCOUNT) {
       // TODO(taha) [defer] - Both here and in the bigquery plugin, add validation for the service account
       // credentials object, and log a more descriptive error message
       try {
-        const credentials = JSON.parse(datasourceConfiguration.authConfig.googleServiceAccount.value ?? '');
+        const credentials = JSON.parse(datasourceConfiguration.authConfig?.googleServiceAccount?.value ?? '');
         authClient = new google.auth.GoogleAuth({
           credentials,
-          scopes: datasourceConfiguration.authConfig.scope
+          scopes: datasourceConfiguration.authConfig?.scope
         });
       } catch (err) {
         throw new IntegrationError(`Failed to parse the service account object. Error:\n${err}`);
@@ -338,7 +348,7 @@ export default class GoogleSheetsPlugin extends BasePlugin {
     } else {
       authClient = new google.auth.OAuth2({});
       authClient.setCredentials({
-        access_token: datasourceConfiguration.authConfig.authToken
+        access_token: datasourceConfiguration.authConfig?.authToken
       });
     }
     google.options({ auth: authClient });
@@ -361,7 +371,7 @@ export default class GoogleSheetsPlugin extends BasePlugin {
         range: `${sheetTitle}!A1:${MAX_A1_RANGE}`
       });
       let columnIndex = 0;
-      result.data?.values.forEach((row) => {
+      result.data?.values?.forEach((row) => {
         if (rowsNumber === 0) {
           row?.forEach((cellData) => {
             columns.push({
