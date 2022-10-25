@@ -282,7 +282,7 @@ export default class GoogleSheetsPlugin extends BasePlugin {
       allColumns = await this.extractAllColumns(spreadsheetId, sheetTitle, sheetsClient, headerRowNumber, jsonData);
       await this.writeTableHeader(sheetsClient, allColumns, spreadsheetId, sheetTitle, headerRowNumber);
     } else {
-      allColumns = await this.extractDataColumns(jsonData);
+      allColumns = this.extractDataColumns(jsonData);
     }
     const destinationRange = `${sheetTitle}!A${rowsNumber + 1}:${MAX_COLUMN}${rowsNumber + 1}`;
     const rowsData = this.dataToCells(jsonData, allColumns);
