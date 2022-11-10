@@ -82,10 +82,11 @@ export default class GoogleSheetsPlugin extends BasePlugin {
       const googleSheetsAction = actionConfiguration.action;
       const ret = new ExecutionOutput();
       validateCommon(actionConfiguration);
+      const [, , sheetsClient] = this.getGoogleClients(datasourceConfiguration);
       switch (googleSheetsAction) {
         case GoogleSheetsActionType.READ_SPREADSHEET:
           ret.output = await this.readFromSpreadsheet(
-            datasourceConfiguration as GoogleSheetsDatasourceConfiguration,
+            sheetsClient,
             actionConfiguration.spreadsheetId,
             actionConfiguration.sheetTitle,
             actionConfiguration.extractFirstRowHeader,
@@ -95,7 +96,7 @@ export default class GoogleSheetsPlugin extends BasePlugin {
         case GoogleSheetsActionType.READ_SPREADSHEET_RANGE:
           validateReadRange(actionConfiguration);
           ret.output = await this.readFromSpreadsheet(
-            datasourceConfiguration as GoogleSheetsDatasourceConfiguration,
+            sheetsClient,
             actionConfiguration.spreadsheetId,
             actionConfiguration.sheetTitle,
             actionConfiguration.extractFirstRowHeader,
@@ -107,7 +108,7 @@ export default class GoogleSheetsPlugin extends BasePlugin {
           // eslint-disable-next-line no-case-declarations
           const jsonDataAppend = validateRowsToAppend(actionConfiguration.data);
           ret.output = await this.appendToSpreadsheet(
-            datasourceConfiguration as GoogleSheetsDatasourceConfiguration,
+            sheetsClient,
             actionConfiguration.spreadsheetId,
             actionConfiguration.sheetTitle,
             jsonDataAppend
@@ -117,7 +118,7 @@ export default class GoogleSheetsPlugin extends BasePlugin {
           // eslint-disable-next-line no-case-declarations
           const jsonDataCreate = validateCreateRows(actionConfiguration);
           ret.output = await this.writeToSpreadsheet(
-            datasourceConfiguration as GoogleSheetsDatasourceConfiguration,
+            sheetsClient,
             actionConfiguration.spreadsheetId,
             actionConfiguration.sheetTitle,
             jsonDataCreate,
@@ -130,7 +131,7 @@ export default class GoogleSheetsPlugin extends BasePlugin {
         case GoogleSheetsActionType.CLEAR_SPREADSHEET:
           validateClear(actionConfiguration);
           ret.output = await this.clearSheet(
-            datasourceConfiguration as GoogleSheetsDatasourceConfiguration,
+            sheetsClient,
             actionConfiguration.spreadsheetId,
             actionConfiguration.sheetTitle,
             actionConfiguration.preserveHeaderRow ?? false,
@@ -146,13 +147,12 @@ export default class GoogleSheetsPlugin extends BasePlugin {
 
   // Deprecated
   async appendToSpreadsheet(
-    datasourceConfiguration: GoogleSheetsDatasourceConfiguration,
+    sheetsClient: sheets_v4.Sheets,
     spreadsheetId: string,
     sheetTitle: string,
     jsonData: unknown[]
   ): Promise<ExecutionOutput> {
     const ret = new ExecutionOutput();
-    const [, , sheetsClient] = this.getGoogleClients(datasourceConfiguration);
     const [columnNames, rowsNumber] = await this.extractSheetColumnsRows(spreadsheetId, sheetTitle, sheetsClient);
     const rowsData = this.dataToCells(jsonData, columnNames);
     const requestBody: sheets_v4.Schema$ValueRange = {
@@ -174,13 +174,12 @@ export default class GoogleSheetsPlugin extends BasePlugin {
   }
 
   async clearSheet(
-    datasourceConfiguration: GoogleSheetsDatasourceConfiguration,
+    sheetsClient: sheets_v4.Sheets,
     spreadsheetId: string,
     sheetTitle: string,
     preserveHeaderRow: boolean,
     headerRowNumber: number
   ): Promise<sheets_v4.Schema$ClearValuesResponse> {
-    const [, , sheetsClient] = this.getGoogleClients(datasourceConfiguration);
     const rangeToClear = preserveHeaderRow ? `${sheetTitle}!A${headerRowNumber + 1}:${MAX_A1_RANGE}` : `${sheetTitle}!A1:${MAX_A1_RANGE}`;
     const clearResult = await sheetsClient.spreadsheets.values.clear({
       spreadsheetId: spreadsheetId,
@@ -206,7 +205,7 @@ export default class GoogleSheetsPlugin extends BasePlugin {
    * @param {number | undefined} headerRowNumber row number that should be used for a header
    */
   async writeToSpreadsheet(
-    datasourceConfiguration: GoogleSheetsDatasourceConfiguration,
+    sheetsClient: sheets_v4.Sheets,
     spreadsheetId: string,
     sheetTitle: string,
     jsonData: unknown[],
@@ -216,7 +215,6 @@ export default class GoogleSheetsPlugin extends BasePlugin {
     headerRowNumber: number
   ): Promise<sheets_v4.Schema$UpdateValuesResponse> {
     let result;
-    const [, , sheetsClient] = this.getGoogleClients(datasourceConfiguration);
     switch (destinationType) {
       case GoogleSheetsDestinationType.APPEND: {
         result = await this.doAppend(spreadsheetId, sheetTitle, jsonData, sheetsClient, headerRowNumber, includeHeaderRow ?? false);
@@ -442,24 +440,18 @@ export default class GoogleSheetsPlugin extends BasePlugin {
   }
 
   async readFromSpreadsheet(
-    datasourceConfiguration: GoogleSheetsDatasourceConfiguration,
+    sheetsClient: sheets_v4.Sheets,
     spreadsheetId: string,
     sheetTitle: string,
     extractFirstRowHeader?: boolean,
     format = GoogleSheetsFormatType.FORMATTED_VALUE,
     range?: string
   ): Promise<CellValueType[]> {
-    const [, , sheetsClient] = this.getGoogleClients(datasourceConfiguration);
     const params: sheets_v4.Params$Resource$Spreadsheets$Values$Get = {
       spreadsheetId: spreadsheetId
     };
     let columnNamesOffset = 0;
-    const columnNames = await this.extractSheetColumns(
-      spreadsheetId ?? '',
-      sheetTitle ?? '',
-      sheetsClient,
-      extractFirstRowHeader ? 1 : undefined
-    );
+    const columnNames = extractFirstRowHeader ? await this.extractSheetColumns(spreadsheetId ?? '', sheetTitle ?? '', sheetsClient, 1) : [];
     if (range && extractFirstRowHeader) {
       const a1Range = new A1(range);
       if (range != a1Range.toString()) {
