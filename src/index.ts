@@ -87,8 +87,8 @@ export default class GoogleSheetsPlugin extends BasePlugin {
         case GoogleSheetsActionType.READ_SPREADSHEET:
           ret.output = await this.readFromSpreadsheet(
             sheetsClient,
-            actionConfiguration.spreadsheetId,
-            actionConfiguration.sheetTitle,
+            actionConfiguration.spreadsheetId as string,
+            actionConfiguration.sheetTitle as string,
             actionConfiguration.extractFirstRowHeader,
             actionConfiguration.format
           );
@@ -97,8 +97,8 @@ export default class GoogleSheetsPlugin extends BasePlugin {
           validateReadRange(actionConfiguration);
           ret.output = await this.readFromSpreadsheet(
             sheetsClient,
-            actionConfiguration.spreadsheetId,
-            actionConfiguration.sheetTitle,
+            actionConfiguration.spreadsheetId as string,
+            actionConfiguration.sheetTitle as string,
             actionConfiguration.extractFirstRowHeader,
             actionConfiguration.format,
             actionConfiguration.range
@@ -109,8 +109,8 @@ export default class GoogleSheetsPlugin extends BasePlugin {
           const jsonDataAppend = validateRowsToAppend(actionConfiguration.data);
           ret.output = await this.appendToSpreadsheet(
             sheetsClient,
-            actionConfiguration.spreadsheetId,
-            actionConfiguration.sheetTitle,
+            actionConfiguration.spreadsheetId as string,
+            actionConfiguration.sheetTitle as string,
             jsonDataAppend
           );
           return ret;
@@ -119,8 +119,8 @@ export default class GoogleSheetsPlugin extends BasePlugin {
           const jsonDataCreate = validateCreateRows(actionConfiguration);
           ret.output = await this.writeToSpreadsheet(
             sheetsClient,
-            actionConfiguration.spreadsheetId,
-            actionConfiguration.sheetTitle,
+            actionConfiguration.spreadsheetId as string,
+            actionConfiguration.sheetTitle as string,
             jsonDataCreate,
             actionConfiguration.writeToDestinationType as GoogleSheetsDestinationType,
             actionConfiguration.rowNumber ?? 2,
@@ -132,8 +132,8 @@ export default class GoogleSheetsPlugin extends BasePlugin {
           validateClear(actionConfiguration);
           ret.output = await this.clearSheet(
             sheetsClient,
-            actionConfiguration.spreadsheetId,
-            actionConfiguration.sheetTitle,
+            actionConfiguration.spreadsheetId as string,
+            actionConfiguration.sheetTitle as string,
             actionConfiguration.preserveHeaderRow ?? false,
             actionConfiguration.headerRowNumber ?? 1
           );
@@ -660,11 +660,13 @@ function validateCommon(actionConfiguration: GoogleSheetsActionConfiguration) {
     throw new IntegrationError(`Sheet name is required`);
   }
 }
+
 function validateReadRange(actionConfiguration: GoogleSheetsActionConfiguration) {
   if (actionConfiguration.range && !A1.isValid(actionConfiguration.range)) {
     throw new IntegrationError(`The provided range ${actionConfiguration.range} is invalid`);
   }
 }
+
 function validateRowsToAppend(data?: string): unknown[] {
   if (!data) {
     throw new IntegrationError(`Rows to append are required`);
