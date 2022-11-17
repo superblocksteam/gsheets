@@ -123,9 +123,9 @@ export default class GoogleSheetsPlugin extends BasePlugin {
             actionConfiguration.sheetTitle as string,
             jsonDataCreate,
             actionConfiguration.writeToDestinationType as GoogleSheetsDestinationType,
-            actionConfiguration.rowNumber ?? 2,
+            parseInt(actionConfiguration.rowNumber ?? '2'),
             actionConfiguration.includeHeaderRow ?? false,
-            actionConfiguration.headerRowNumber ?? 1
+            parseInt(actionConfiguration.headerRowNumber ?? '1')
           );
           return ret;
         case GoogleSheetsActionType.CLEAR_SPREADSHEET:
@@ -135,7 +135,7 @@ export default class GoogleSheetsPlugin extends BasePlugin {
             actionConfiguration.spreadsheetId as string,
             actionConfiguration.sheetTitle as string,
             actionConfiguration.preserveHeaderRow ?? false,
-            actionConfiguration.headerRowNumber ?? 1
+            parseInt(actionConfiguration.headerRowNumber ?? '1')
           );
           return ret;
       }
@@ -394,7 +394,7 @@ export default class GoogleSheetsPlugin extends BasePlugin {
   }
 
   dynamicProperties(): string[] {
-    return ['range', 'data'];
+    return ['range', 'data', 'rowNumber', 'headerRowNumber'];
   }
 
   async test(datasourceConfiguration: GoogleSheetsDatasourceConfiguration): Promise<void> {
@@ -690,17 +690,25 @@ function validateCreateRows(actionConfiguration: GoogleSheetsActionConfiguration
     if (!actionConfiguration.rowNumber) {
       throw new IntegrationError(`Row number is required`);
     }
-    if ((actionConfiguration.headerRowNumber ?? 0) >= actionConfiguration.rowNumber) {
+    if (isNaN(parseInt(actionConfiguration.rowNumber))) {
+      throw new IntegrationError(`Row number must be a number`);
+    }
+    if ((actionConfiguration.headerRowNumber ?? 0) >= parseInt(actionConfiguration.rowNumber)) {
       throw new IntegrationError(`Data must be inserted after the table header row number (${actionConfiguration.headerRowNumber})`);
     }
-    if (actionConfiguration.rowNumber <= 0) {
+    if (parseInt(actionConfiguration.rowNumber) <= 0) {
       throw new IntegrationError(`Row number has to be a positive number`);
     }
   }
   if (actionConfiguration.preserveHeaderRow && !actionConfiguration.headerRowNumber) {
     throw new IntegrationError(`Header row number is required because you are including a header row`);
   }
-  if (actionConfiguration.preserveHeaderRow && actionConfiguration.headerRowNumber && actionConfiguration.headerRowNumber <= 0) {
+  if (
+    actionConfiguration.preserveHeaderRow &&
+    actionConfiguration.headerRowNumber &&
+    isNaN(parseInt(actionConfiguration.headerRowNumber)) &&
+    parseInt(actionConfiguration.headerRowNumber) <= 0
+  ) {
     throw new IntegrationError(`Header row number has to be a positive number`);
   }
   if (!actionConfiguration.writeToDestinationType) {
