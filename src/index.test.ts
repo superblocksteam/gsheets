@@ -5,7 +5,7 @@ import {
   GoogleSheetsDestinationType,
   GoogleSheetsActionType
 } from '@superblocksteam/shared';
-import { EXECUTE_COMMON_PARAMETERS } from '@superblocksteam/shared-backend';
+import { DUMMY_EXECUTE_COMMON_PARAMETERS } from '@superblocksteam/shared-backend';
 import { sheets_v4 } from 'googleapis';
 import GoogleSheetsPlugin from '.';
 
@@ -200,7 +200,7 @@ describe('g-sheets read from a range', () => {
     });
     mockGoogleApis({ setCredentialsMock: setCredentialsMock, getMock: getValuesMock });
     const readRangeResult = await plugin.execute({
-      ...EXECUTE_COMMON_PARAMETERS,
+      ...DUMMY_EXECUTE_COMMON_PARAMETERS,
       actionConfiguration: {
         spreadsheetId: 'sheetId',
         sheetTitle: 'sheetTitle',
@@ -274,7 +274,7 @@ describe('g-sheets read from a range', () => {
       });
     mockGoogleApis({ setCredentialsMock: setCredentialsMock, getMock: getValuesMock });
     const readRangeResult = await plugin.execute({
-      ...EXECUTE_COMMON_PARAMETERS,
+      ...DUMMY_EXECUTE_COMMON_PARAMETERS,
       actionConfiguration: {
         spreadsheetId: 'sheetId',
         sheetTitle: 'sheetTitle',
@@ -327,7 +327,7 @@ describe('g-sheets read from a range', () => {
     mockGoogleApis({ setCredentialsMock: setCredentialsMock, getMock: getValuesMock });
     await expect(
       plugin.execute({
-        ...EXECUTE_COMMON_PARAMETERS,
+        ...DUMMY_EXECUTE_COMMON_PARAMETERS,
         datasourceConfiguration: {},
         actionConfiguration: {
           spreadsheetId: 'sheetId',
@@ -368,7 +368,7 @@ describe('g-sheets append', () => {
     });
     mockGoogleApis({ setCredentialsMock: setCredentialsMock, getMock: getValuesMock, appendMock: appendMock });
     const appendResult = await plugin.execute({
-      ...EXECUTE_COMMON_PARAMETERS,
+      ...DUMMY_EXECUTE_COMMON_PARAMETERS,
       datasourceConfiguration: {},
       actionConfiguration: {
         spreadsheetId: 'sheetId',
@@ -450,7 +450,7 @@ describe('g-sheets append', () => {
       appendMock: appendMock
     });
     const appendResult = await plugin.execute({
-      ...EXECUTE_COMMON_PARAMETERS,
+      ...DUMMY_EXECUTE_COMMON_PARAMETERS,
       datasourceConfiguration: {},
       actionConfiguration: {
         spreadsheetId: 'sheetId',
@@ -527,7 +527,7 @@ describe('g-sheets create spreadsheet rows', () => {
     });
     mockGoogleApis({ setCredentialsMock: setCredentialsMock, clearMock: clearMock, updateMock: updateMock });
     const writeResult = await plugin.execute({
-      ...EXECUTE_COMMON_PARAMETERS,
+      ...DUMMY_EXECUTE_COMMON_PARAMETERS,
       datasourceConfiguration: {},
       actionConfiguration: {
         spreadsheetId: 'sheetId',
@@ -579,7 +579,7 @@ describe('g-sheets clear a spreadsheet', () => {
     });
     mockGoogleApis({ setCredentialsMock: setCredentialsMock, clearMock: clearMock });
     const clearResult = await plugin.execute({
-      ...EXECUTE_COMMON_PARAMETERS,
+      ...DUMMY_EXECUTE_COMMON_PARAMETERS,
       datasourceConfiguration: {},
       actionConfiguration: {
         spreadsheetId: 'sheetId',
@@ -733,7 +733,7 @@ describe('get google clients', () => {
 describe('validations', () => {
   const plugin: GoogleSheetsPlugin = new GoogleSheetsPlugin();
   test('validate common: no spreadsheet', async () => {
-    await expect(plugin.execute({ ...EXECUTE_COMMON_PARAMETERS, actionConfiguration: {} })).rejects.toThrow(
+    await expect(plugin.execute({ ...DUMMY_EXECUTE_COMMON_PARAMETERS, actionConfiguration: {} })).rejects.toThrow(
       new IntegrationError(`Google Sheets request failed. Spreadsheet is required`)
     );
   });
@@ -741,7 +741,7 @@ describe('validations', () => {
   test('validate common: no sheet title', async () => {
     await expect(
       plugin.execute({
-        ...EXECUTE_COMMON_PARAMETERS,
+        ...DUMMY_EXECUTE_COMMON_PARAMETERS,
         actionConfiguration: {
           sheetTitle: 'sheetTitle'
         }
@@ -754,7 +754,7 @@ describe('validations', () => {
     mockGoogleApis({ setCredentialsMock: setCredentialsMock });
     await expect(
       plugin.execute({
-        ...EXECUTE_COMMON_PARAMETERS,
+        ...DUMMY_EXECUTE_COMMON_PARAMETERS,
         actionConfiguration: {
           action: GoogleSheetsActionType.CREATE_SPREADSHEET_ROWS,
           sheetTitle: 'sheetTitle',
@@ -770,7 +770,7 @@ describe('validations', () => {
     mockGoogleApis({ setCredentialsMock: setCredentialsMock });
     await expect(
       plugin.execute({
-        ...EXECUTE_COMMON_PARAMETERS,
+        ...DUMMY_EXECUTE_COMMON_PARAMETERS,
         actionConfiguration: {
           action: GoogleSheetsActionType.CREATE_SPREADSHEET_ROWS,
           sheetTitle: 'sheetTitle',
@@ -788,7 +788,7 @@ describe('validations', () => {
     mockGoogleApis({ setCredentialsMock: setCredentialsMock });
     await expect(
       plugin.execute({
-        ...EXECUTE_COMMON_PARAMETERS,
+        ...DUMMY_EXECUTE_COMMON_PARAMETERS,
         actionConfiguration: {
           action: GoogleSheetsActionType.CREATE_SPREADSHEET_ROWS,
           sheetTitle: 'sheetTitle',
@@ -805,7 +805,7 @@ describe('validations', () => {
     mockGoogleApis({ setCredentialsMock: setCredentialsMock });
     await expect(
       plugin.execute({
-        ...EXECUTE_COMMON_PARAMETERS,
+        ...DUMMY_EXECUTE_COMMON_PARAMETERS,
         actionConfiguration: {
           action: GoogleSheetsActionType.CREATE_SPREADSHEET_ROWS,
           sheetTitle: 'sheetTitle',
@@ -824,7 +824,7 @@ describe('validations', () => {
     mockGoogleApis({ setCredentialsMock: setCredentialsMock });
     await expect(
       plugin.execute({
-        ...EXECUTE_COMMON_PARAMETERS,
+        ...DUMMY_EXECUTE_COMMON_PARAMETERS,
         actionConfiguration: {
           action: GoogleSheetsActionType.CREATE_SPREADSHEET_ROWS,
           sheetTitle: 'sheetTitle',
@@ -842,7 +842,7 @@ describe('validations', () => {
     mockGoogleApis({ setCredentialsMock: setCredentialsMock });
     await expect(
       plugin.execute({
-        ...EXECUTE_COMMON_PARAMETERS,
+        ...DUMMY_EXECUTE_COMMON_PARAMETERS,
         actionConfiguration: {
           action: GoogleSheetsActionType.CREATE_SPREADSHEET_ROWS,
           sheetTitle: 'sheetTitle',
