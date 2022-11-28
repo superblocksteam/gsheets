@@ -24,6 +24,8 @@ type CellValueType = boolean | string | number | sheets_v4.Schema$ErrorValue;
 const MAX_A1_RANGE = 'ZZZ10000000'; // static limit based on https://support.google.com/drive/answer/37603
 const MAX_COLUMN = 'ZZZ'; // static limit based on https://support.google.com/drive/answer/37603
 
+const LIST_FILES_COMMON_FIELDS = { q: "mimeType='application/vnd.google-apps.spreadsheet'", fields: 'nextPageToken, files(id,name)' };
+
 class SheetColumn {
   name: string;
   type: string;
@@ -41,8 +43,7 @@ export default class GoogleSheetsPlugin extends BasePlugin {
       let nextPageToken: string | null | undefined;
       do {
         const result = await driveClient.files.list({
-          q: "mimeType='application/vnd.google-apps.spreadsheet'",
-          fields: 'nextPageToken, files(id,name)',
+          ...LIST_FILES_COMMON_FIELDS,
           pageToken: nextPageToken ?? undefined
         });
         nextPageToken = result.data.nextPageToken;
@@ -107,11 +108,15 @@ export default class GoogleSheetsPlugin extends BasePlugin {
         case GoogleSheetsActionType.APPEND_SPREADSHEET:
           // eslint-disable-next-line no-case-declarations
           const jsonDataAppend = validateRowsToAppend(actionConfiguration.data);
-          ret.output = await this.appendToSpreadsheet(
+          ret.output = await this.writeToSpreadsheet(
             sheetsClient,
             actionConfiguration.spreadsheetId as string,
             actionConfiguration.sheetTitle as string,
-            jsonDataAppend
+            jsonDataAppend,
+            GoogleSheetsDestinationType.APPEND,
+            1,
+            false,
+            0
           );
           return ret;
         case GoogleSheetsActionType.CREATE_SPREADSHEET_ROWS:
@@ -143,34 +148,6 @@ export default class GoogleSheetsPlugin extends BasePlugin {
     } catch (err) {
       throw new IntegrationError(`Google Sheets request failed. ${err.message}`);
     }
-  }
-
-  // Deprecated
-  async appendToSpreadsheet(
-    sheetsClient: sheets_v4.Sheets,
-    spreadsheetId: string,
-    sheetTitle: string,
-    jsonData: unknown[]
-  ): Promise<ExecutionOutput> {
-    const ret = new ExecutionOutput();
-    const [columnNames, rowsNumber] = await this.extractSheetColumnsRows(spreadsheetId, sheetTitle, sheetsClient);
-    const rowsData = this.dataToCells(jsonData, columnNames);
-    const requestBody: sheets_v4.Schema$ValueRange = {
-      range: `${sheetTitle}!A${rowsNumber + 1}:L${rowsNumber + 1}`,
-      majorDimension: 'ROWS',
-      values: rowsData
-    };
-    const appendResult = await sheetsClient.spreadsheets.values.append({
-      spreadsheetId: spreadsheetId,
-      range: `${sheetTitle}!A${rowsNumber + 1}:L${rowsNumber + 1}`,
-      requestBody: requestBody,
-      valueInputOption: 'RAW'
-    });
-    if (appendResult.status != 200) {
-      throw new IntegrationError(`Failed to append data to Google Sheet, unexpected status: ${appendResult.status}`);
-    }
-    ret.output = appendResult.data.updates;
-    return ret;
   }
 
   async clearSheet(
@@ -400,10 +377,7 @@ export default class GoogleSheetsPlugin extends BasePlugin {
   async test(datasourceConfiguration: GoogleSheetsDatasourceConfiguration): Promise<void> {
     try {
       const [, driveClient] = this.getGoogleClients(datasourceConfiguration);
-      const result = await driveClient.files.list({
-        q: "mimeType='application/vnd.google-apps.spreadsheet'",
-        fields: 'nextPageToken, files(id, name)'
-      });
+      const result = await driveClient.files.list(LIST_FILES_COMMON_FIELDS);
       if (result.status != 200) {
         throw new IntegrationError(`Failed to test Google Sheet, unexpected status: ${result.status}`);
       }
@@ -454,9 +428,6 @@ export default class GoogleSheetsPlugin extends BasePlugin {
     const columnNames = extractFirstRowHeader ? await this.extractSheetColumns(spreadsheetId ?? '', sheetTitle ?? '', sheetsClient, 1) : [];
     if (range && extractFirstRowHeader) {
       const a1Range = new A1(range);
-      if (range != a1Range.toString()) {
-        throw new IntegrationError(`The provided range ${range} is invalid`);
-      }
       // return empty set if user had specified A1:XXX and row 1 is used as Table header
       if (a1Range.getHeight() === 1 && a1Range.getRow() === 1) {
         return this.sheetDataToRecordSet([], format, columnNames, columnNamesOffset);
@@ -556,7 +527,7 @@ export default class GoogleSheetsPlugin extends BasePlugin {
       range: `${sheetTitle}!A${headerRowNumber ?? 1}:${MAX_A1_RANGE}`
     });
     const values = result.data?.values;
-    if (headerRowNumber && !values) {
+    if (headerRowNumber && (!values || values.length == 0)) {
       throw new IntegrationError(`The specifed row number(${headerRowNumber ?? 1}) doesn't have a header.`);
     } else if (values) {
       values[0].forEach((cellData) => {
@@ -568,38 +539,6 @@ export default class GoogleSheetsPlugin extends BasePlugin {
       });
     }
     return columns;
-  }
-
-  /**
-   * Extracts columns and a number of rows from a spreadsheet
-   * @param spreadsheetId spreadsheet id to read rows from
-   * @param sheetTitle spreadsheet id to read rows from
-   * @param sheetsClient sheets client to use for reading rows
-   * @returns columns and a number of rows
-   */
-  async extractSheetColumnsRows(
-    spreadsheetId: string,
-    sheetTitle: string,
-    sheetsClient: sheets_v4.Sheets
-  ): Promise<[SheetColumn[], number]> {
-    const columns: SheetColumn[] = [];
-    const result = await sheetsClient.spreadsheets.values.get({
-      spreadsheetId: spreadsheetId,
-      range: `${sheetTitle}!A1:${MAX_A1_RANGE}`
-    });
-    const values = result.data?.values;
-    if (!values) {
-      return [[], 0];
-    } else {
-      values[0].forEach((cellData) => {
-        columns.push({
-          name: cellData,
-          type: 'sheet',
-          sourceColumnIndex: columns.length
-        });
-      });
-    }
-    return [columns, values.length];
   }
 
   /**
@@ -662,8 +601,15 @@ function validateCommon(actionConfiguration: GoogleSheetsActionConfiguration) {
 }
 
 function validateReadRange(actionConfiguration: GoogleSheetsActionConfiguration) {
-  if (actionConfiguration.range && !A1.isValid(actionConfiguration.range)) {
-    throw new IntegrationError(`The provided range ${actionConfiguration.range} is invalid`);
+  if (actionConfiguration.range) {
+    try {
+      const a1Range = new A1(actionConfiguration.range);
+      if (!A1.isValid(actionConfiguration.range) || actionConfiguration.range != a1Range.toString()) {
+        throw new IntegrationError(`The provided range ${actionConfiguration.range} is invalid`);
+      }
+    } catch (err) {
+      throw new IntegrationError(`The provided range ${actionConfiguration.range} is invalid: ${err}`);
+    }
   }
 }
 
@@ -690,10 +636,7 @@ function validateCreateRows(actionConfiguration: GoogleSheetsActionConfiguration
     if (!actionConfiguration.rowNumber) {
       throw new IntegrationError(`Row number is required`);
     }
-    if (isNaN(parseInt(actionConfiguration.rowNumber))) {
-      throw new IntegrationError(`Row number must be a number`);
-    }
-    if ((actionConfiguration.headerRowNumber ?? 0) >= parseInt(actionConfiguration.rowNumber)) {
+    if (actionConfiguration.headerRowNumber && actionConfiguration.headerRowNumber >= actionConfiguration.rowNumber) {
       throw new IntegrationError(`Data must be inserted after the table header row number (${actionConfiguration.headerRowNumber})`);
     }
     if (parseInt(actionConfiguration.rowNumber) <= 0) {
@@ -706,7 +649,7 @@ function validateCreateRows(actionConfiguration: GoogleSheetsActionConfiguration
   if (
     actionConfiguration.preserveHeaderRow &&
     actionConfiguration.headerRowNumber &&
-    isNaN(parseInt(actionConfiguration.headerRowNumber)) &&
+    !isNaN(parseInt(actionConfiguration.headerRowNumber)) &&
     parseInt(actionConfiguration.headerRowNumber) <= 0
   ) {
     throw new IntegrationError(`Header row number has to be a positive number`);
